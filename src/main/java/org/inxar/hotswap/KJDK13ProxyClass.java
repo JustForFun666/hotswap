@@ -49,6 +49,14 @@ class KJDK13ProxyClass extends ProxyClass
     {
 	super(compiler, cls);
 
+        log("class: " + cls.getName());
+        log("classloader: " + cls.getClassLoader().getClass().getName());
+        log("interfaces: " + interfaces);
+
+        for (Class i : interfaces) {
+            log("- " + i.getName());
+        }
+
 	if (newProxyInstance == null)
 	    throw new ProxyException
 		("Cannot instantiate: cannot find java.lang.reflect.Proxy.  "+
@@ -63,6 +71,10 @@ class KJDK13ProxyClass extends ProxyClass
 	System.arraycopy(interfaces, 0, dst, 0, interfaces.length);
 	dst[interfaces.length] = Proxy.class;
 	this.interfaces = dst;
+    }
+
+    protected void log(String msg) {
+        System.out.println("[KJDK13ProxyClass] " + msg);
     }
 
     // ================================

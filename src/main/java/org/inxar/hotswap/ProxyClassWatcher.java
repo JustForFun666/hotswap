@@ -32,7 +32,8 @@ import java.nio.file.Paths;
 import java.nio.file.WatchService;
 import java.nio.file.WatchEvent;
 import java.nio.file.WatchKey;
-
+import java.nio.file.StandardWatchEventKinds;
+import com.sun.nio.file.SensitivityWatchEventModifier;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_DELETE;
 import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
@@ -103,7 +104,7 @@ public class ProxyClassWatcher implements ProxyClassMonitor
     }
 
     /**
-     * Begin classes this ProxyClass for changes.
+     * Begin watching this ProxyClass for changes.
      */
     public void watch(ProxyClass cls) {
         File src = cls.getSourceFile().toFile();
@@ -112,12 +113,14 @@ public class ProxyClassWatcher implements ProxyClassMonitor
             return;
         }
 
-        Path file = src.toPath();
+        Path file = src.toPath().toAbsolutePath();
+        //String filename = file.toString();
         if (!classes.containsKey(file)) {
             Path dir = file.getParent();
             try {
                 register(dir, cls);
                 classes.put(file, cls);
+                System.out.println("[ProxyClassWatcher]: Watching " + file);
             } catch (IOException ioex) {
                 System.err.println("Error while trying to watch " + dir);
                 ioex.printStackTrace();
@@ -126,7 +129,7 @@ public class ProxyClassWatcher implements ProxyClassMonitor
     }
 
     /**
-     * Stop classes this ProxyClass for changes.
+     * Stop watching this ProxyClass for changes.
      */
     public void unwatch(ProxyClass cls) {
         File src = cls.getSourceFile().toFile();
@@ -135,11 +138,13 @@ public class ProxyClassWatcher implements ProxyClassMonitor
             return;
         }
 
-        Path file = src.toPath();
+        Path file = src.toPath().toAbsolutePath();
+        //String filename = file.toString();
         if (classes.containsKey(file)) {
             Path dir = file.getParent();
             classes.remove(file);
             unregister(dir, cls);
+            System.out.println("[ProxyClassWatcher]: Unwatching " + file);
         }
     }
 
@@ -150,8 +155,12 @@ public class ProxyClassWatcher implements ProxyClassMonitor
         DirEntry entry = dirs.get(dir);
         if (entry == null) {
             entry = new DirEntry();
-            entry.key = dir.register(service, ENTRY_MODIFY);
+            //entry.key = dir.register(service, ENTRY_MODIFY);
 
+            // http://stackoverflow.com/questions/9588737/is-java-7-watchservice-slow-for-anyone-else
+            entry.key = dir.register(service,
+                                     new WatchEvent.Kind[]{StandardWatchEventKinds.ENTRY_MODIFY},
+                                     SensitivityWatchEventModifier.HIGH);
             if (dirs.isEmpty()) {
                 start();
             }
@@ -206,6 +215,7 @@ public class ProxyClassWatcher implements ProxyClassMonitor
             key = service.take();
 
             for (WatchEvent<?> event : key.pollEvents()) {
+                System.out.println("WatchEvent: " + event.getClass());
                 WatchEvent.Kind<?> kind = event.kind();
 
                 if (kind == OVERFLOW) {
@@ -214,18 +224,20 @@ public class ProxyClassWatcher implements ProxyClassMonitor
 
                 @SuppressWarnings("unchecked")
                     WatchEvent<Path> ev = (WatchEvent<Path>) event;
-                Path filename = ev.context();
-                ProxyClass cls = classes.get(filename);
+                Path context = ev.context();
+                Path dir = (Path)key.watchable();
+                Path file = dir.resolve(context);
+                ProxyClass cls = classes.get(file);
                 if (cls != null) {
-                    System.out.println(kind.name() + ": " + filename);
+                    System.out.println(kind.name() + ": " + file);
                     if (kind == ENTRY_MODIFY) {
                         cls.setChanged();
                     } else {
-                        System.err.println("Ignoring event kind " + kind + " for " + filename);
+                        System.err.println("Ignoring event kind " + kind + " for " + file);
                     }
                 } else {
                     System.err.println("No proxyClass registered under "
-                                       + filename);
+                                       + file);
                 }
             }
 

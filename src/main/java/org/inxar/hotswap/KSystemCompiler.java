@@ -2,7 +2,7 @@
  * $Id$
  *
  * Copyright (C) 2001 Paul Cody Johnston - pcj@inxar.org
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
@@ -56,7 +56,7 @@ import java.util.Iterator;
 public class KSystemCompiler extends ProxyCompiler
 {
     // ================================
-    // Constructors 
+    // Constructors
     // ================================
 
     /**
@@ -70,7 +70,7 @@ public class KSystemCompiler extends ProxyCompiler
 	this.commandName = commandName;
 	initSystem();
     }
-    
+
     /**
      * Constructs a new <code>ProxyCompiler</code> having a default
      * <code>ClassLoader</code> and command name (for example
@@ -82,7 +82,7 @@ public class KSystemCompiler extends ProxyCompiler
 	this.commandName = commandName;
 	initSystem();
     }
-    
+
     protected void initSystem()
     {
 	if (commandName.endsWith("jikes")) {
@@ -91,8 +91,8 @@ public class KSystemCompiler extends ProxyCompiler
 		if (home.endsWith("/jre")) {
 		    int len = home.length() - 4;
 		    home = home.substring(0, len);
-		}			
-		
+		}
+
 		getClasspath().add(home + "/jre/lib/rt.jar");
 		getClasspath().add(home + "/lib/tools.jar");
 	    }
@@ -104,12 +104,12 @@ public class KSystemCompiler extends ProxyCompiler
     // ================================
 
     // ================================
-    // ProxyCompiler Methods 
+    // ProxyCompiler Methods
     // ================================
 
-    synchronized int compile(String className, 
-			     ProxyCompiler.Resource sourceFile, 
-			     ProxyCompiler.Resource classFile) 
+    synchronized int compile(String className,
+			     ProxyCompiler.Resource sourceFile,
+			     ProxyCompiler.Resource classFile)
     {
 	// Check to see if recompilation is advised.
 	switch (filestat(sourceFile, classFile)) {
@@ -126,7 +126,7 @@ public class KSystemCompiler extends ProxyCompiler
                compilation; return trivial */
 	case RC_FILESTAT_CLASS_CURRENT:
 	    return RC_COMPILE_TRIVIAL;
-	    
+
 	    /* if the classfile is expired then continue processing */
 	case RC_FILESTAT_CLASS_EXPIRED:
 	    break;
@@ -150,21 +150,22 @@ public class KSystemCompiler extends ProxyCompiler
 	    if (classFile.exists()) {
 
 		long lastMod = classFile.lastModified();
-		
+
 		c = new KSystemCommand(cmd.toString());
 		c.run();
-		
+
 		wasSuccessful = lastMod < classFile.lastModified();
-		
+
 	    } else {
-		
+
 		c = new KSystemCommand(cmd.toString());
 		c.run();
-		
+
 		wasSuccessful = classFile.exists();
-		
+
 	    }
 
+            System.out.println("[KSystemCompiler] " + cmd.toString());
 	} catch (IOException ioex) {
 
 	    StringWriter sw = new StringWriter();
@@ -182,24 +183,24 @@ public class KSystemCompiler extends ProxyCompiler
 
 	int rc = wasSuccessful ? RC_COMPILE_SUCCESS : RC_COMPILE_FAILURE;
 
-	if (hasListeners()) 
-	    fire(new ProxyCompileEvent(this, 
+	if (hasListeners())
+	    fire(new ProxyCompileEvent(this,
 				       className,
-				       cmd.toString(), 
-				       out, 
-				       err, 
+				       cmd.toString(),
+				       out,
+				       err,
 				       rc));
 	return rc;
     }
 
     // ================================
-    // Other Methods 
+    // Other Methods
     // ================================
 
-    protected StringBuffer getCommand() 
+    protected StringBuffer getCommand()
     {
 	StringBuffer cmd = new StringBuffer(commandName);
-	
+
 	if (opts != null) {
 	    int count = 0;
 	    Iterator i = opts.iterator();
@@ -210,10 +211,10 @@ public class KSystemCompiler extends ProxyCompiler
 
 	if (dst != null)
 	    cmd.append(" -d ").append(dst);
-	
+
 //  	if (sourcepath != null)
 //  	    cmd.append(" -sourcepath ").append(sourcepath);
-	
+
 	if (cps != null) {
 	    cmd.append(" -classpath ");
 	    int count = 0;
@@ -229,9 +230,9 @@ public class KSystemCompiler extends ProxyCompiler
     }
 
     // ================================
-    // Fields 
+    // Fields
     // ================================
 
     // compiler command name (jikes, javac)
-    protected String commandName;	
+    protected String commandName;
 }

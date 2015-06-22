@@ -29,7 +29,7 @@ public class ComponentImpl implements Component, ProxyObject
 
     public void execute()
     {
-	System.out.println(this);
+	System.out.println(this + " Hello Go Home Now!!!  Oh wait you're back ")) ;
     }
 
     public long getSleepMillis()

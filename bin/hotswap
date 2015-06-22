@@ -1,0 +1,41 @@
+#/bin/sh
+ 
+if [ "$JAVA_HOME" = "" ]; then
+    echo "[hotswap][error] JAVA_HOME environment variable not set."
+    echo "[hotswap][error] Aborting."
+    exit
+fi
+
+# System stuff.  Edit as needed.
+#JAVA=$JAVA_HOME/bin/java
+JAVA=java
+
+# Where to find tools.jar for compiler
+TOOLSJAR=$JAVA_HOME/lib/tools.jar
+
+# Classpath for this JVM
+CLASSPATH=target/classes
+
+# Mainclass to start on this JVM
+MAINCLASS=org.inxar.hotswap.example.Main
+
+# Location where dynamically compiled classes will go
+DSTPATH=target/compiled/classes
+
+# Location where to look for hotswap java file sources
+SRCPATH=src/test/java
+
+# Classpath to be passed to the runtime compiler process
+COMPILER_CLASSPATH=$CLASSPATH
+
+# The implementing component class
+IMPLCLASS=org.inxar.hotswap.example.ComponentImpl
+
+CMD="$JAVA -classpath $CLASSPATH:$TOOLSJAR $MAINCLASS \
+ $DSTPATH $SRCPATH $COMPILER_CLASSPATH $IMPLCLASS"
+
+echo "[hotswap][debug] $CMD"
+
+$CMD
+
+echo "[hotswap][debug] Done."

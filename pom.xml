@@ -8,22 +8,28 @@
   <name>hotswap</name>
   <url>http://maven.apache.org</url>
 
-    <organization>
-        <name>pubref</name>
-        <url>http://pubref.org</url>
-    </organization>
+  <organization>
+      <name>pubref</name>
+      <url>http://pubref.org</url>
+  </organization>
 
-    <developers>
-        <developer>
-            <id>pcj</id>
-            <name>Paul Cody Johnston</name>
-            <email>pcj127@gmail.com</email>
-            <roles>
-	        <role>developer</role>
-            </roles>
-        </developer>
-    </developers>
+  <developers>
+      <developer>
+          <id>pcj</id>
+          <name>Paul Cody Johnston</name>
+          <email>pcj127@pubref.com</email>
+          <roles>
+	      <role>developer</role>
+          </roles>
+      </developer>
+  </developers>
 
+  <properties>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+  </properties>
+
+<!--
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -32,5 +38,20 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+-->
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.10.3</version>
+        <configuration>
+          <show>private</show>
+          <nohelp>true</nohelp>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 
 </project>

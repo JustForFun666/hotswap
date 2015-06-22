@@ -41,30 +41,32 @@ import java.util.Collections;
  **/
 public abstract class ProxyCompiler
 {
+    public static final String SEMVER = "0.8.1";
+
     /**
      * Compilation Return Code meaning that a compilation was NOT
      * attempted because it was deemed unnecessary (ie the problem
      * was trivial).
      **/
-    public static final int RC_COMPILE_TRIVIAL = 0;
-
-    /**
-     * Compilation Return Code meaning that a compilation was NOT
-     * attempted because an the sourcefile does not exist.
-     **/
-    public static final int RC_COMPILE_SOURCE_MISSING = 1;
+    public static final int RC_COMPILE_TRIVIAL = -1;
 
     /**
      * Compilation Return Code meaning that a compilation was
      * attempted and completed successfully.
      **/
-    public static final int RC_COMPILE_SUCCESS = 2;
+    public static final int RC_COMPILE_SUCCESS = 0;
 
     /**
      * Compilation Return Code meaning that a compilation was
      * attempted and NOT completed successfully.
      **/
-    public static final int RC_COMPILE_FAILURE = 3;
+    public static final int RC_COMPILE_FAILURE = 1;
+
+    /**
+     * Compilation Return Code meaning that a compilation was NOT
+     * attempted because an the sourcefile does not exist.
+     **/
+    public static final int RC_COMPILE_SOURCE_MISSING = 2;
 
     /**
      * Compilation Return Code meaning complete lack of knowledge of
@@ -114,6 +116,11 @@ public abstract class ProxyCompiler
     protected ProxyCompiler(ProxyClassMonitor monitor)
     {
 	this(ProxyCompiler.class.getClassLoader(), monitor);
+    }
+
+    protected ProxyCompiler(ClassLoader parent)
+    {
+	this(parent, new ProxyClassWatcher());
     }
 
     protected ProxyCompiler(ClassLoader parent, ProxyClassMonitor monitor)
@@ -338,6 +345,7 @@ public abstract class ProxyCompiler
      */
     protected void add(String className, ProxyClass cls) {
         proxyClasses.put(className, cls);
+        monitor.watch(cls);
     }
 
     /**
@@ -345,8 +353,8 @@ public abstract class ProxyCompiler
      * cache and returns the cached instance or <code>null</code> if
      * no such <code>ProxyClass</code> exists in this cache.
      **/
-    synchronized public ProxyClass remove(ProxyClass cls)
-    {
+    synchronized public ProxyClass remove(ProxyClass cls) {
+        monitor.unwatch(cls);
 	return (ProxyClass)proxyClasses.remove(cls.getName());
     }
 
@@ -510,6 +518,22 @@ public abstract class ProxyCompiler
 	return new KFileClassLoader(parent, this).loadClass(name);
     }
 
+    String formatClasspath() {
+        List list = getClasspath();
+	if (list == null && list.size() == 0) {
+            return "";
+        }
+        StringBuilder cp = new StringBuilder();
+        int count = 0;
+        Iterator i = cps.iterator();
+        while (i.hasNext()) {
+            if (count++ > 0)
+                cp.append(PATHSEP);
+            cp.append(i.next().toString());
+        }
+        return cp.toString();
+    }
+
     // ================================
     // Protected Methods
     // ================================
@@ -590,6 +614,8 @@ public abstract class ProxyCompiler
          **/
 	java.io.File toFile();
     }
+
+
 }
 
 /*

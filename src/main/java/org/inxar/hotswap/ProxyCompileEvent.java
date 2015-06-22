@@ -2,7 +2,7 @@
  * $Id$
  *
  * Copyright (C) 2001 Paul Cody Johnston - pcj@inxar.org
- * 
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation; either version 2 of the
@@ -40,10 +40,10 @@ public class ProxyCompileEvent extends ProxyEvent
      * string that was executed as well as any standard output and any
      * standard error.
     **/
-    public ProxyCompileEvent(ProxyCompiler source, 
-			     String className, 
-			     String cmd, 
-			     String out, 
+    public ProxyCompileEvent(ProxyCompiler source,
+			     String className,
+			     String cmd,
+			     String out,
 			     String err,
 			     int rc)
     {
@@ -54,6 +54,7 @@ public class ProxyCompileEvent extends ProxyEvent
 	this.err = err;
 	this.rc = rc;
     }
+
 
     /**
      * Prints a summary of the compilation.
@@ -70,27 +71,27 @@ public class ProxyCompileEvent extends ProxyEvent
 	case ProxyCompiler.RC_COMPILE_UNKNOWN:
 	    b.append("UNKNOWN");
 	    break;
-	    
+
 	case ProxyCompiler.RC_COMPILE_SOURCE_MISSING:
 	    b.append("MISSING SOURCEFILE");
 	    break;
-	    
+
 	case ProxyCompiler.RC_COMPILE_FAILURE:
 	    b.append("COMPILATION FAILURE");
 	    break;
-	    
+
 	case ProxyCompiler.RC_COMPILE_TRIVIAL:
 	    b.append("COMPILATION UNNECESSARY");
 	    break;
-	    
+
 	case ProxyCompiler.RC_COMPILE_SUCCESS:
 	    b.append("COMPILATION SUCCESS");
 	    break;
-	    
+
 	    /* we missed a case */
 	default:
 	    throw new InternalError(); // bad coding
-	    
+
 	}
 	b.append(NL).append(NL);
 

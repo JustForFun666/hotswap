@@ -50,59 +50,86 @@ public class Main
 	String classpath = argv[2];
 	String className = argv[3];
 	String version = System.getProperty("java.version");
-	if (version.startsWith("1.3"))
-	    isJDK13 = true;
+	//if (version.startsWith("1.2"))
+        isJDK13 = true;
 
-	trace("Welcome to hotswap, you are running Java version: "+version);
+	trace("Welcome to Hotswap " + ProxyCompiler.SEMVER
+              + " in " + (isJDK13 ? "JDK1.3+" : "JDK1.2") + " mode (java version: "+version+")");
 
-	// Setup an event listener
+        // ================================================================
+        // Setup compiler
+        //
+        ProxyCompiler compiler = null;
+
+        try {
+            compiler = new KJavaxCompiler();
+
+            //compiler = new KJavacCompiler();
+            trace("Using com.sun.tools.javac.Main compiler");
+        } catch (IllegalStateException isex) {
+            isex.printStackTrace();
+            trace("Falling back to system javac interface (slow)...");
+            compiler = new KSystemCompiler("javac");
+
+            /* if you have jikes, use it instead */
+            //compiler = new KSystemCompiler("jikes");
+        }
+
+        compiler.setDestinationpath(destinationpath);
+        compiler.setSourcepath(sourcepath);
+        compiler.getClasspath().add(classpath);
+
+        // ================================================================
+	// Setup proxyclass
+        //
+	final ProxyClass cls = (isJDK13)
+	    ? compiler.load(className)
+	    : compiler.loadJDK12(className);
+
+        // ================================================================
+	// Setup proxy instance
+        //
+	final Proxy proxy = cls.newInstance();
+
+        // ================================================================
+	// Create an event listener
+        //
 	ProxyEventListener l = new ProxyEventListener() {
 		public void notify(ProxyEvent evt) {
+                    if (evt instanceof ProxyClassDirtyEvent) {
+                        notifyDirty((ProxyClassDirtyEvent)evt);
+                    } else {
+                        System.out.println
+                            ("[Main]["+new Date()+"] "+ evt);
+                    }
+		}
+
+		public void notifyDirty(ProxyClassDirtyEvent evt) {
 		    System.out.println
-			("[Main]["+new Date()+"] "+ evt);
+			("[Main]["+new Date()+"] class dirty, re-executing component " + evt.getProxyClass());
+
+		    Component component = null;
+		    if (proxy.hotswap_getProxyClass().isJDK13()) {
+			component = (Component)proxy;
+		    } else {
+			component = (Component)proxy.hotswap();
+		    }
+
+		    System.out.println();
+		    System.out.println(">>>>>>>>");
+		    component.execute();
+		    System.out.println("<<<<<<<<");
+		    System.out.println();
+
 		}
 	    };
 
-	// Setup compiler
-	ProxyCompiler compiler = null;
-	{
-	    try {
-		compiler = new KJavacCompiler();
-	    } catch (IllegalStateException isex) {
-		isex.printStackTrace();
-		trace("Falling back to system javac interface (slow)...");
-		compiler = new KSystemCompiler("javac");
+        // register for events
+        compiler.addCompileListener(l);
+        cls.addClassSwapListener(l);
+        proxy.hotswap_addObjectSwapListener(l);
 
-		/* if you have jikes, use it instead */
-		//compiler = new KSystemCompiler("jikes");
-	    }
-
-	    compiler.setDestinationpath(destinationpath);
-	    compiler.setSourcepath(sourcepath);
-	    compiler.getClasspath().add(classpath);
-	    compiler.addCompileListener(l);
-	}
-
-	// Setup proxyclass
-	ProxyClass cls =  (isJDK13)
-	    ? compiler.load(className)
-	    : compiler.loadJDK12(className);
-	{
-	    cls.addClassSwapListener(l);
-	}
-
-	// Setup the Proxy
-	Proxy proxy = cls.newInstance();
-	{
-	    proxy.hotswap_addObjectSwapListener(l);
-	}
-
-	// Start the hotswap thread
-	Thread t = new Thread(new Hotswapper(proxy));
-	{
-	    trace("Starting hotswap thread on "+className+"...");
-	    t.start();
-	}
+	trace("Waiting for file changes at: "+cls.getSourceFile().toFile().getAbsolutePath());
     }
 
     public static void trace(String msg)

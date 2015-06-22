@@ -124,20 +124,27 @@ public class KJavacCompiler extends ProxyCompiler
 	    .toString();
 	String[] argv = split(cmd, " ");
 
-	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	//ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        StringWriter sout = new StringWriter();
+        PrintWriter pout = new PrintWriter(sout);
 
 	int rc = RC_COMPILE_UNKNOWN;
 
 	try {
 
 	    // Create a new Javac compiler instance.
-	    OutputStream os = new BufferedOutputStream(baos);
-	    Object[] args = new Object[] { os, COMMAND_NAME };
-	    Object javac = ctor.newInstance(args);
+	    //OutputStream os = new BufferedOutputStream(baos);
+	    //Object[] args = new Object[] { os, COMMAND_NAME };
+	    //Object javac = ctor.newInstance(args);
+
+            // TODO: can I re-use this instance?
+	    Object javac = ctor.newInstance();
 
 	    //wasSuccessful = new sun.tools.javac.Main(os, COMMAND_NAME).compile(argv);
-	    wasSuccessful = ((Boolean)compile.invoke(javac, new Object[]{argv})).booleanValue();
-	    rc = wasSuccessful ? RC_COMPILE_SUCCESS : RC_COMPILE_FAILURE;
+	    Integer resultCode = (Integer)compile.invoke(javac, new Object[]{argv, pout});
+            System.out.println("javac resultCode: " + resultCode);
+	    rc = resultCode.intValue();
+            wasSuccessful = rc == RC_COMPILE_SUCCESS;
 
 	} catch (Exception ioex) {
 	    ioex.printStackTrace();
@@ -151,14 +158,14 @@ public class KJavacCompiler extends ProxyCompiler
 	if (!wasSuccessful)
 	    out = "Compilation did not complete successfully.";
 
-	err = baos.toString();
+	//err = baos.toString();
 
 	if (hasListeners())
 	    fire(new ProxyCompileEvent(this,
 				       className,
 				       "javac " + cmd.toString(),
-				       out,
-				       err,
+				       sout.toString(),
+				       null,
 				       rc));
 
 	return rc;
@@ -230,7 +237,8 @@ public class KJavacCompiler extends ProxyCompiler
 	    Class main = Class.forName("com.sun.tools.javac.Main");
 
 	    // Setup the compile method
-	    Class[] params = new Class[]{ String[].class };
+	    //Class[] params = new Class[]{ String[].class };
+	    Class[] params = new Class[]{ String[].class, java.io.PrintWriter.class };
 	    compile = main.getMethod("compile", params);
 
 	    // Setup the constructor

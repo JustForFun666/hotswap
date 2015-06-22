@@ -75,6 +75,7 @@ class KFileClassLoader extends ClassLoader
 
     protected synchronized Class findClass(String className) throws ClassNotFoundException
     {
+        System.out.println("[KFileClassLoader] findClass " + className);
 	FileInputStream in = null;
 
 	ProxyCompiler.Resource sourceFile = compiler.getSourceFile(className);
@@ -132,6 +133,7 @@ class KFileClassLoader extends ClassLoader
 		   already have it.  Otherwise continue with the
 		   reload. */
 	    case ProxyCompiler.RC_COMPILE_TRIVIAL:
+                System.out.println("[KFileClassLoader] skipped compilation of " + className);
 		if (oldClass != null)
 		    return oldClass;
 		else
@@ -139,6 +141,7 @@ class KFileClassLoader extends ClassLoader
 
 		/* if the compilation succeeded, go ahead as planned */
 	    case ProxyCompiler.RC_COMPILE_SUCCESS:
+                System.out.println("[KFileClassLoader] successfully compiled " + className);
 		break;
 
 		/* we missed a case */
@@ -160,6 +163,8 @@ class KFileClassLoader extends ClassLoader
 
 	    Class newClass = defineClass(className, buf, 0, buf.length);
 	    resolveClass(newClass);
+
+            System.out.println("[KFileClassLoader] defined & resolved " + className);
 
 	    /* okay, we have a new class. Store it and the return it
                to the caller. */
