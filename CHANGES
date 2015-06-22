@@ -1,0 +1,17 @@
+2001-06-15  Paul Cody Johnston  <pcj@osmium.inxar.org>
+
+	* Hotswap: Cleaned up for alpha release.  Dynamic proxy classes
+	now seem to be working.  Bring in the bug reports!
+
+2001-06-14  Paul Cody Johnston  <pcj@osmium.inxar.org>
+
+	* Hotswap: Initial cvs commit at 0_7.  This is a pre-alpha
+	release. 0_8 series will be alpha, 0_9 will be beta, and 1_0 will
+	be production.
+
+2001-06-14  Paul Cody Johnston  <pcj@osmium.inxar.org>
+
+	* Hotswap: Started project today (Sunday) at 0_7.  0_8 will be
+	alpha, 0_9 will be beta, and 1_0 will be first production release.
+
+	

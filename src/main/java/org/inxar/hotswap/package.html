@@ -1,0 +1,787 @@
+<html>
+<body>
+
+This package provides the core interfaces and reference implementation.
+
+<P>
+
+<a href="http://www.inxar.org/hotswap">HotSwap</a> provides a robust
+library for updating the implementation of an object at runtime,
+otherwise known as <i>hotswapping</i>.  This is achieved through
+recompilation, dynamic class reloading, and object state migration
+throughout the life of an application. Hotswapping makes Java feel
+more like an interpreted language than a compiled language; it is
+fundamentally useful for incremental development of an application,
+so-called <i>application evolution</i> or <i>dynamic application
+development</i>.
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Hotswap Library Usage Summary
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+<font color="blue">// Get a ProxyCompiler instance</font>
+ProxyCompiler compiler = new KJavacCompiler();
+ProxyCompiler compiler = new KSystemCompiler("javac");
+ProxyCompiler compiler = new KSystemCompiler("jikes");
+
+<font color="blue">// Configure it</font>
+compiler.setDestinationpath("/tmp/classes");
+compiler.setSourcepath("/home/myname/myproject/src");
+compiler.getClasspath().add("/home/myname/myproject/classes");
+compiler.getClasspath().add("/usr/share/java/jsdk2.0/lib/jsdk.jar");
+
+<font color="blue">// JDK1.2 or JDK1.3 usage</font>
+ProxyClass cls = compiler.loadJKD12("com.myname.myproject.MyObject");
+Proxy proxy = cls.newInstance();
+MyObject obj = (MyObject)proxy.hotswap();
+
+<font color="blue">// JDK1.3 usage only; assumes MyObject implements MyInterface</font>
+ProxyClass cls = compiler.load("com.myname.myproject.MyObject");
+MyInterface obj = (MyInterface)cls.newInstance();
+
+<font color="blue">// Additional Stuff; assumes mylistener implements ProxyEventListener</font>
+compiler.addCompileListener(mylistener);
+cls.addClassSwapListener(mylistener);
+proxy.addObjectSwapListener(mylistener);
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+<h4>Contents</h4>
+<a href="#assumptions">Assumptions</a><br>
+<a href="#example">Example</a><br>
+<a href="#semantics">Transaction Semantics</a><br>
+<a href="#tradeoffs">Design Tradeoffs, Versioning, and AutoEnqueue</a><br>
+<a href="#classloaders">ClassLoader Issues</a><br>
+<a href="#relationship">Relationship to java.lang.reflect.Proxy</a><br>
+<P>
+
+<i>Hotswapping</i> is the process of changing the implementation of an
+object at run-time. This requires monitoring the state of the code
+that implements the object and, if necessary, recompiling and
+reloading the <code>Class</code> using dynamic classloading
+techniques.
+
+<P>
+
+The Java Virtual Machine does not support hotswapping directly.  Once
+an object has been constructed it will retain its identity to the
+<code>Class</code> that constructed it for the entire lifetime of the
+object.  Therefore, <i>true</i> hotswapping is impossible, but it can
+be simulated at the application level and requires the notion of a
+<i>proxy</i>, meaning: <i>the agency, function, or office of a deputy
+who acts as a substitute for another</i> (<a
+href="http://www.m-w.com/cgi-bin/dictionary?proxy">MerriamWebster</a>).
+
+<P>
+
+When an object <code><b>o</b></code> is hotswapped, the Class
+<code><b>c</b></code> is <i>recompiled</i> and <i>reloaded</i> into
+memory.  If the reload step is successful, the <code>ProxyClass</code>
+instance mediating the reload will free the old Class
+<code><b>c</b></code> and replace it with the new Class
+<code><b>c'</b></code>.  Once <code><b>c'</b></code> has been
+reloaded, a new object <code><b>o'</b></code> is constructed by
+reflection from <code><b>c'</b></code> under the auspice of the
+delegate <code>Proxy</code>.
+
+<P>
+
+The hotswap operation is a two-phase commit protocol.  If the object
+<code><b>o'</b></code> is an <code>instanceof</code> of
+<code>ProxyObject</code>, it will be allowed to participate in the
+transaction and synchronize its state from the old object
+<code><b>o</b></code> via the <code>hotswap_onPrepare(Object
+oldInstance)</code> method.  Likewise, if the old object
+<code><b>o</b></code> is an instanceof <code>ProxyObject</code>, it
+will be notified of its impending destruction via the
+<code>hotswap_onRelease()</code> method.  The reference to the old
+object <code><b>o</b></code> is then dropped and <code><b>o</b></code>
+will be subsequently garbage collected. See <a
+href="#semantics">Transaction Semantics</a> for more detail.
+
+<P>
+
+Garbage collection of the old object <code><b>o</b></code> is of
+course contingent on its reachability; if any other object references
+to <code><b>o</b></code> exists in the JVM, it will not be garbage
+collected.  This means it is important for the developer not to keep
+direct references to <code><b>o</b></code> but rather the
+<code>Proxy</code> instance acting on <code><b>o</b></code>'s behalf.
+
+<P>
+
+HotSwap also provides transparent support for <a
+href="http://java.sun.com/j2se/1.3/docs/guide/reflection/proxy.html"><code>JDK1.3</code>
+Dynamic Proxy Classes</a> within the context of a 1.3-compatible JVM.
+
+<P>
+
+<a name="assumptions">
+<h4>Assumptions</h4>
+
+<li>The first assumption is that you expect the implementation of a
+particular object to change throughout the life of your application.
+This need is particularly great in the development of a long-lived
+application; for myself during development of web-based
+(Servlet-based) applications.  I was going nuts waiting for the entire
+application to reload from scratch (or having to restart the entire
+webserver).
+<P>
+
+
+<li>The second assumption is that the changes you make to an object at
+run-time have little or ideally no impact on the memory layout of the
+object.  Runtime alteration of instance variables creates a situation
+where two different sized boxes are supposed to hold the same
+information; the 'ol square peg in a round hole issue.  Hotswapping is
+most appropriate when you are changing procedural code, not data
+layout.
+<P>
+
+<li>The third assumption is that you have a working understanding of
+how classloading works in Java.  This is necessary because otherwise
+you'll get unreasonably frustrated.  See the section on ClassLoaders
+below.
+
+<a name="example">
+<h4>Example</h4>
+
+<h5>Scenario</h5> 
+
+You are developing a website that processes input from a CGI form.
+You have a `controller' class (MVC paradigm) within the scope of a
+servlet that checks the form input and conditionally stores some
+information in a database table.  Call this the
+<code>com.example.bank.FormProcessor</code> class.
+
+<h5>Problem</h5>
+
+You want to tune the development of <code>FormProcessor</code> while
+the application is running. Since it's about a 30 second round-trip
+for the application to reload and to get the application in the
+required state (you have to login to the website first), you're
+looking to speed up development cycle. Sure, the servet container
+you're using provides autoreloading, but the granularity is too large
+--- any changes cause the entire application to be restarted.
+
+<h5>Solution</h5>
+
+Rather than your servlet holding a reference to the
+<code>FormProcessor</code> directly, you change the implementation
+temporarily (you'll change it back later during final production code
+preparation) such that the servlet holds a <code>Proxy</code> to the
+<code>FormProcessor</code>.
+
+<P>
+
+During each <code>HttpRequest</code> the servlet fetches the
+<code>FormProcessor</code> object from the proxy.  When a request is
+made to fetch the <code>FormProcessor</code> object from the proxy,
+the internals of the <code>Proxy</code> implementation (provided by
+this library) checks to see of the sourcefile has changed.  If it has,
+the sourcefile will be automatically recompiled, the
+<code>FormProcessor</code> class will be reloaded into memory, and a
+new <code>FormProcessor</code> instance will be reflected.
+
+<P>
+
+As you can see, before the <code>FormProcessor</code> object gets its
+grubbies on the incoming request, a check is made to see if the code
+is outdated.  This allows you to incrementally develop the
+<code>FormProcessor</code> implementation without having to restart
+the application.
+
+<h5>Implementation</h5>
+
+In order to get the necessary <code>Proxy</code> object, you'll need
+to setup some other stuff such that the library knows what the name of
+the <code>FormProcessor</code> class is, where in the filesystem it's
+located, and how to compile it.
+
+<h5>Step 1: Obtain a ProxyCompiler instance</h5>
+
+The root object in the HotSwap library is the
+<code>ProxyCompiler</code>.  It acts as a factory for
+<code>ProxyClass</code> instances which in turn act as factories for
+<code>Proxy</code> instances.  The reference implementation is
+<code>KJavacCompiler</code>.
+
+<P>
+
+<P>You need to tell the compiler where the sourcecode is, where to put
+the compiled classes, and what classpath settings and other options to
+include.  The <code>KSystemCompiler</code> implementation runs a
+system command whereas <code>KJavacCompiler</code> interfaces with
+<code>sun.tools.javac.Main</code> and requires <code>tools.jar</code>
+in the <code>CLASSPATH</code>.  Choose the implementation that best
+fits your setup.
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Instantiation and configuration of the ProxyCompiler
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+ProxyCompiler compiler = new KJavacCompiler();
+
+compiler.setDestinationpath("/tmp/classes");
+compiler.setSourcepath("/home/myaccount/myproject/src");
+compiler.getClasspath().add("/home/myaccount/myproject/classes");
+compiler.getClasspath().add("/usr/share/java/jsdk2.0/lib/jsdk.jar");
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+Take a good look at the filepaths given in the example.  The
+sourcepath is required to help the compiler find the source file
+<code>/home/myaccount/myproject/src/com/example/bank/FormProcessor.java</code>.
+
+<P>
+
+The compiled class
+<code>/tmp/classes/com/example/bank/FormProcessor.class</code> will be
+read and its bytes used to define the <code>Class</code>.  It is
+important that this classfile NOT be visible to other classloaders in
+your application.  For example, if <code>/tmp/classes</code> or some
+other <code>FormProcessor.class</code> happened to be in your
+classpath when starting the application, the system classloader would
+load the class and the <code>ClassLoader</code> internal to HotSwap
+would never get the opportunity and hence will not be reloadable.
+
+<h5>Step 3: Obtain the ProxyClass</h5>
+
+The <code>ProxyClass</code> holds a reference to the Class object that
+will be periodically reloaded.  Use the <code>ProxyCompiler</code>
+to create the <code>ProxyClass</code>:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Obtaining a ProxyClass instance
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+ProxyClass cls = compiler.loadJDK12("com.example.bank.FormProcessor");
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+<h5>Step 4: Get the Proxy</h5>
+
+You're finally ready to get the <code>Proxy</code> object so patiently
+waited for.  One last question to ask is whether
+<code>FormProcessor</code> object requires constructor arguments.  It
+turns out that the only public <code>FormProcessor</code> constructor
+looks like:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+The FormProcessor constructor
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+public FormProcessor(com.example.bank.ConfigObject conf) {
+    this.dbConnection = conf.getConnection();
+}
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+It this case you have to give constructor arguments to the
+<code>Proxy</code> object such that it can reflect the right
+constructor:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Obtaining a Proxy instance
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+Proxy proxy = cls.newInstance(new Object[]{ configObject });
+
+<font color="blue">//
+// Equivalent but more verbose
+//</font>
+Proxy proxy = cls.newInstance();
+Class[] params = new Class[1];
+params[0] = com.example.bank.ConfigObject.class;
+Object[] args = new Object[1];
+args[0] = configObject;
+proxy.hotswap_setConstructorParameters(args);
+proxy.hotswap_setConstructorArguments(args);
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+<h5>Step 5: Use the Proxy</h5>
+
+Now inside the <code>doGet()</code> method of the servlet:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Using the Proxy
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+FormProcessor p = (FormProcessor)proxy.hotswap();
+p.process(httpRequest);
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+Each request will trigger a potential hotswap of the
+<code>FormProcessor</code> class.  How RAD! (ahem... rapid application
+development, that is).
+
+<h5>Step 6 [optional]: Implement ProxyObject on FormProcessor</h5>
+
+It turns out that <code>FormProcessor</code> implementation is not
+completely vacuous.  In particular, it holds a database connection
+that it got from the <code>ConfigObject</code> in its constructor.
+The problem is that you are now leaking database connections every
+time the class is reloaded since the object never had a chance to
+release the connection.
+
+<P>
+
+To solve this problem, the <code>FormProcessor</code> object needs to
+get contextual clues about it's lifecycle in the context of a hotswap
+transaction.  This is the purpose of the <code>ProxyObject</code>
+interface.  If the object being held by the <code>Proxy</code>
+instance implements <code>ProxyObject</code>, it gets special
+treatment: when the object is created, the
+<code>hotswap_onPrepare(Object old)</code> method is called; likewise
+<code>hotswap_onRelease()</code> is invoked when the object is being
+thrown away.  Here is the updated implementation of
+<code>FormProcessor.java</code>:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Sample implementation of ProxyObject
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+public class FormProcessor 
+implements com.example.bank.Processor, org.inxar.hotswap.ProxyObject
+{
+    ...
+
+    public void hotswap_onPrepare(Object oldInstance) {
+        this.oldInstance = (ProxyObject)oldInstance;
+    }
+
+    public void hotswap_onCommit() {
+        if (this.oldInstance != null) {
+            this.dbConnection = (DBConnection)oldInstance.hotswap_get("dbConnection");
+<font color="blue">
+            // Let the oldInstance be rubbish</font>
+	    this.oldInstance = null; 
+        }
+    }
+
+    public void hotswap_onRollback() {
+        this.oldInstance = null;
+    }
+
+    public void hotswap_onRelease() {
+        if (dbConnection != null) {
+            dbConnection.close();
+        }
+    }
+
+    public Object hotswap_get(Object key) {
+        if ("dbConnection".equals(key)) {
+            DBConnection tmp = this.dbConnection;
+	    this.dbConnection = null;
+	    return tmp;
+        }
+    }  
+
+    protected DBConnection dbConnection;
+    protected ProxyObject oldInstance;
+}
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+Here we chose to transfer the connection to the new object rather than
+closing it and opening a new one.  In general, the implementation
+strategies of <code>ProxyObject</code> are akin to those of
+<code>Cloneable</code>, but you have to pass arguments through the
+window of the <code>hotswap_get(Object key)</code> method.
+
+<P>
+
+The <code>hotswap_get</code> method was not initially part of the
+<code>ProxyObject</code> interface.  Can you figure out why it had to
+be added?  
+
+<P>
+<font color="silver">
+
+TODO: Explain the reasoning behind <code>hotswap_get(Object)</code>.
+You can figure it out on your own by trying to cast the
+<code>Object</code> argument to <code>FormProcessor</code> from within
+<code>hotswap_onPrepare(Object)</code>.
+
+</font>
+
+<h5>Step 7 [optional]: Better Error Reporting</h5>
+
+The only problem is that there is no output when a compilation error
+occurs; it's as though the jikes standard output has disappeared.  The
+is because, in fact, it has disappeared.  Rather than printing out to
+<code>System.out</code> (or <code>System.err</code>), the
+<code>ProxyCompiler</code> slurps up all the output into a string and
+wraps it in a <code>ProxyCompileEvent</code>.  Unfortunately, there
+are no <code>ProxyEventListener</code> instances that are monitoring
+for this event, so nothing it shown.  A modification of the setup of
+the <code>ProxyCompiler</code> in step 2 with an anonymous class fixes
+the problem:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Printing Compilation Output
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+compiler.addCompileListener(new ProxyEventListener() {
+    public void notify(ProxyEvent evt) {
+        System.out.println(evt);
+    }
+});
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+<h5>JDK1.3 Dynamic Proxy Classes</h5>
+
+In this example it was necessary to replace any persistent references
+to the <code>FormProcessor</code> object with a reference to the
+delegate <code>Proxy</code> instance.  This requires somewhat
+draconian changes to our servlet application, though certainly
+liveable.
+
+<P>
+
+An arguably better option would have the <code>Proxy</code> instance
+be type-assignable to <code>FormProcessor</code>; rather than
+<code>Proxy</code> being a compositional stub to the
+<code>FormProcessor</code> object, it would be a transparent
+implementation of <code>FormProcessor</code> itself that handles
+hotswapping behind the scenes.
+
+<P>
+
+If this were possible, it would not be necessary to change the
+instance variables in our servlet.  All we would have to do is
+instantiate a <code>Proxy</code> implementation rather than the
+concrete <code>FormProcessor</code> implementation directly.
+
+<P>
+
+This is the notion of <i><a
+href="http://java.sun.com/j2se/1.3/docs/guide/reflection/proxy.html">dynamic
+proxy classes</a></i> introduced in <code>JDK1.3</code>.  A proxy
+class is a concrete type constructed at runtime by the JVM that
+implements the interfaces you specify.  The <code>ProxyClass</code> in
+this library has convience methods that support the construction of
+<code>JDK1.3</code> proxy classes.
+
+<P>
+
+To support this design in this example it is necessary to abstract the
+<code>FormProcessor</code> as an interface.  Luckily for us,
+<code>FormProcessor</code> is a concrete implementation of the
+<code>Processor</code> interface.  <i>Design by interface is required
+to use dynamic proxy classes</i>.
+
+<P>
+
+In order to take advantage of dynamic proxy classes, we have to make
+sure we are running in a <code>JDK1.3</code> JVM and make a few
+changes to the example code:
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Implementation changes to use dynamic proxy classes
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre>
+<font color="blue">//
+// Change Step 3 to load a JDK1.3 proxy class rather than not.
+//</font><font color="silver">
+/* ProxyClass cls = compiler.loadJDK13("com.example.bank.FormProcessor"); */</font>
+ProxyClass cls = compiler.load("com.example.bank.FormProcessor");
+
+<font color="blue">//
+// Change Step 4 such that we cast to Processor.  We can forget that
+// the object is not the real thing.
+//</font><font color="silver">
+/* Proxy proxy = cls.newInstance(new Object[] { configObject }); */</font>
+Processor p = (Processor)cls.newInstance(new Object[] { configObject });
+
+<font color="blue">//
+// Change Step 5 back to the original, natural usage pattern 
+// (hotswap is now called automagically within the dynamic proxy).
+//</font>
+<font color="silver">/* FormProcessor p = (FormProcessor)proxy.hotswap(); */</font>
+p.process(httpRequest);
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+The <code>Processor</code> instance is still a <code>Proxy</code> and
+will continue to hotswap as necessary, but the interface has changed;
+we only have to concern ourselves with the original type system.
+
+<p>
+
+Note that even if you are running <code>JDK1.3</code>, dynamic proxy
+classes are not always appropriate.  The granularity of hotswap checks
+becomes potentially significantly larger: Rather than hotswapping only
+when <code>Proxy.hotswap()</code> is called, the proxy will attempt at
+every method invocation on the dynamic proxy object.  Depending on the
+usage model if the object in question, this could have performance
+issues.  Also, dynamic proxy class instances have to more processing
+per invocation than non-proxy class instances, so that's another thing
+to consider.
+
+<P>
+
+However, if performance is not an primary concern at the given level
+of development, proxy classes are pretty cool.  Not that many people
+even realize that they exist, so you should consider yourself special.
+
+<P><i>&lt;/end-of-example&gt;</i>
+
+
+<a name="semantics">
+<h4>Hotswap Transaction Semantics</h4>
+
+A hotswap operation is a two-phase commit protocol. It involves a
+single <code>ProxyClass</code> <code><b>pc</b></code> and a set of
+<code>Proxy</code> instances <code><b>P</b></code> that are the
+children of <code><b>pc</b></code> and willfully elect to be a
+participant of the transaction.  The <code>ProxyClass</code>
+<code><b>pc</b></code> manages a <code>Class</code>
+<code><b>c</b></code>; each <code>Proxy</code> <code><b>p</b></code>
+in <code><b>P</b></code> manages a single proxy <code>Object</code>
+<code><b>po</b></code> that may or may not be an instance of
+<code>ProxyObject</code>.  <code><b>PO</b></code> is the set of all
+<code><b>po</b></code> objects in <code><b>P</b></code>.  The
+sourcefile <code><b>fs</b></code> and classfile <code><b>fc</b></code>
+of <code><b>c</b></code> are used to determine if hotswapping is
+necessary.
+
+<h5>Required Conditions for Transactional Commit</h5>
+
+A hotswap, triggered by an invocation of <code>Proxy.hotswap()</code>,
+is an all-or-none-operation that requires the following conditions:
+<P>
+
+<li>A non-empty set <code>PO</code> (there must be at least one
+<code>Proxy</code> instance willing to participate).<br>
+
+<li>A successful [re]compilation of the sourcefile
+<code><b>sf</b></code> to <code><b>cf'</b></code>.<br>
+
+<li>A successful classload of <code><b>c</b></code>.
+
+<li>Consensus from all <code><b>po</b></code> objects in
+<code><b>PO</b></code> that the hotswap may succeed.  If any
+<code><b>po</b></code> returns <code>false</code> from its
+<code>hotswap_onPrepare(Object)</code> method, the transaction is
+aborted and rolled back as necessary.  If no object
+<code><b>po</b></code> in <code><b>PO</b></code> implements
+<code>ProxyObject</code>, the transaction will always complete
+successfully.
+
+<h5>Protocol</h5>
+
+<u>Step 1: Recompile</u><br> The <code>ProxyCompiler</code> is used to
+run a compilation command on the system.  If the classfile
+<code><b>fc</b></code> changes to <code><b>fc'</b></code>, compilation
+is assumed to have succeeded (this is an implementation detail).
+
+<p>
+
+<u>Step 2: Classload</u><br> <code>ProxyClass</code>
+<code><b>pc</b></code> attempts to load a new <code>Class</code>
+<code><b>c'</b></code> from <code><b>fc'</b></code>.  The old class
+<code><b>c</b></code> is not discarded unless the entire hotswap
+succeeds.
+
+<P>
+
+<u>Step 3: Preparation</u><br> <code>ProxyClass</code> holds a list of
+all <code><b>p</b></code> child <code>Proxy</code> objects.  Each
+<code><b>po</b></code> in <code><b>PO</b></code> is allowed to prepare
+via the <code>hotswap_onPrepare(Object)</code> method (if it
+implements <code>ProxyObject</code>).  If any <code>po</code> returns
+false, the hotswap is aborted. Any <code><b>po</b></code> objects that
+have been prepared will be rolled back via the
+<code>hotswap_onRollback()</code> method and the new class
+<code>c'</code> is discarded.
+
+<P>
+<u>Step 4: Commit</u><br> All objects <code>po</code> that have
+participated in the transaction will be notified on the commit via the
+<code>hotswap_onCommit()</code> method.
+
+<P>
+<u>Step 5: Release</u><br> All objects <code>po</code> that implement
+<code>ProxyObject</code> will be notified on their senescence via the
+<code>hotswap_onRelease()</code> method.  The old class
+<code><b>c</b></code> is discarded and is replaced with
+<code><b>c'</b></code> (the changing of the guard).
+
+<P>
+
+<a name="classloaders">
+<h4>ClassLoaders</h4>
+
+Some of the most annoying bugs I encountered while developing this
+library stemmed from my incomplete understanding of the
+<code>ClassLoader</code>.  Needless to say it is a central concept in
+Java, one that I had underestimated.  If you don't know much about
+classloading I suggest your edify:
+
+<P>
+
+<li><a
+href="http://www-105.ibm.com/developerworks/education.nsf/java-onlinecourse-bytitle/06B49359139A1AD186256A310049AC9B?OpenDocument">Understanding
+the Java ClassLoader</a> (IBM DeveloperWorks, requires registration)
+<li><a
+href="http://www.javaworld.com/javaworld/jw-03-2000/jw-03-classload.html">Create
+a custom Java 1.2-style ClassLoader</a> (JavaWorld) <li><a
+href="http://java.sun.com/docs/books/vmspec/2nd-edition/html/ConstantPool.doc.html#72007">Creation
+and Loading</a> (Java Virtual Machine Specification)
+
+<P>
+
+Here are some bullet points that I think are important:
+
+<P>
+
+<li>The identity of a <code>Class</code> is not the name of the class,
+it is the name of the class AND the defining <code>ClassLoader</code>.
+You can have more than one <code>com.example.MyClass</code> in a
+single JVM without conflict if they have different
+<code>ClassLoader</code> instances.
+
+<P>
+
+TODO: Explain the bizarre consequences of this.
+
+<P>
+
+<li>Every <code>ClassLoader</code> has a parent
+<code>ClassLoader</code> except for one at the root, sometimes called
+the <i>primordial classloader</i>.
+
+<P>
+
+<li>Classloading follows a delegation model such that the parent
+<code>ClassLoader</code> is given the opportunity to load a
+<code>Class</code> before the child.  This means that if any
+classloaders up the heirarchy can see the classfile, the
+<code>ClassLoader</code> implementation in this library will not be
+used to load the class and therefore will not be reloadable.  You have
+to pay careful attention to what's in your <code>CLASSPATH</code>.
+
+<P>
+
+<li>The parent <code>ClassLoader</code> is significant.  I struggled
+with a weird bug for about 4 straight hours one day: I was getting
+<code>NoClassDefFoundExceptions</code> for seemingly no reason; my
+classes were not being found despite the classfiles clearly being in
+the right place.  The problem was that I was testing under Jserv,
+which has it's own special <code>AdaptiveClassLoader</code> (or
+something like that), and it was the Jserv classloader that was
+loading the `missing' classes in question. Since delegation only goes
+UP the <code>ClassLoader</code> heirarchy tree, the classes were not
+being found since they were stuck off in a branch.  The solution was
+to grab the Jserv <code>ClassLoader</code> and use that as the parent
+to my <code>ClassLoader</code>.
+
+<a name="relationship">
+<h4>Relationship to java.lang.reflect.Proxy (JDK1.3 Dynamic Proxy Classes)</h4>
+
+The HotSwap Library and <i>dynamic proxy classes</i>
+(<code>JDK1.3</code> - <code>java.lang.reflect.Proxy</code> and
+related interfaces) are two completely different things, they are
+designed to solve different problems.  HotSwap is designed to provide
+dynamic class reloading and object migration, while JDK1.3 dynamic
+proxy class are a general mechanism to create type-safe interface
+implementations on the fly. Both are designed to operate within the
+scope of a running application.
+
+<P>
+
+As it turns out, the problem addressed by HotSwap is a perfect
+application of dynamic proxy classes.  That is, we can use dynamic
+proxy classes as a tool to solve the hotswap problem in a particularly
+elegant way.  Dynamic proxy classes complement HotSwap.  But support
+for dynamic proxy classes in HotSwap is dependent on a JDK1.3
+environment and their usage is optional.
+
+<P>
+
+<img src="../../../../../images/hotswap-1.png" border="0">
+
+</body>
+</html>
+
+
+
+
+
+

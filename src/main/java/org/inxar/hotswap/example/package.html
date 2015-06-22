@@ -1,0 +1,59 @@
+<html>
+<body>
+
+This package provides code used to run the examples.  The main class
+is <code>RunExample</code> (paths are relative to the main
+installation directory):
+
+<P>
+<table border=0 cellpadding="0" cellspacing="0" bgcolor="#999999" width="100%">
+<tr><td>
+<table cellpadding="0" cellspacing="1"><tr><td><font face="helvetica" color="#eeeeee">
+Examples Usage Summary
+</font></td></tr></table>
+</td></tr>
+<tr><td>
+<table border=0 cellpadding="7" cellspacing="1" bgcolor="#eeeeff" width="100%"><tr><td>
+<pre><font color="blue">
+# Path where JDK1.2 or JDK1.3 is installed</font>
+JAVA_HOME=/usr/java/jdk1.3
+<font color="blue">
+# Path where HotSwap is installed</font>
+HOTSWAP=/usr/share/java/inxar/hotswap-x_y_z
+<font color="blue">
+# Name of JDK1.2 or JDK1.3 interpreter</font>
+java \<font color="blue">
+
+ # Classpath for the main application</font>
+ -classpath $HOTSWAP/hotswap.jar:$JAVA_HOME/lib/tools.jar \<font color="blue">
+
+ # Main class</font>
+ example.RunExample \<font color="blue">
+
+ # Path where classfiles are written</font>
+ $HOTSWAP/examples \<font color="blue">
+
+ # Path where sourcefiles are searched</font>
+ $HOTSWAP/examples \<font color="blue">
+
+ # Classpath for the compilation command</font>
+ "$HOTSWAP/hotswap.jar" \<font color="blue">
+
+ # Name of the class to be hotswapped (located in <code>$HOTSWAP/examples</code>)</font>
+ HelloWorld
+</td></tr></table>
+</td></tr>
+</table>
+<P>
+
+You can substitute <code>HelloWorld</code> for an <code>Example</code>
+implementation of your choice.  Although shown here, the
+<code>tools.jar</code> is optional.  There is a
+<code>helloworld.sh</code> script in the <code>./bin</code> directory
+that runs exactly what is shown above.  I've also written a
+<code>helloworld.bat</code> file, but I have my doubts about its
+operability.
+
+<P>
+</body>
+</html>
