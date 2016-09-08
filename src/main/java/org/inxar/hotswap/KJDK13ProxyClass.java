@@ -49,13 +49,13 @@ class KJDK13ProxyClass extends ProxyClass
     {
 	super(compiler, cls);
 
-        log("class: " + cls.getName());
-        log("classloader: " + cls.getClassLoader().getClass().getName());
-        log("interfaces: " + interfaces);
+        // log("jdk13 class impl: " + cls.getName());
+        // log("classloader: " + cls.getClassLoader().getClass().getName());
+        // log("interfaces: " + interfaces);
 
-        for (Class i : interfaces) {
-            log("- " + i.getName());
-        }
+        //for (Class i : interfaces) {
+          //log("- " + i.getName());
+        //}
 
 	if (newProxyInstance == null)
 	    throw new ProxyException
@@ -73,10 +73,6 @@ class KJDK13ProxyClass extends ProxyClass
 	this.interfaces = dst;
     }
 
-    protected void log(String msg) {
-        System.out.println("[KJDK13ProxyClass] " + msg);
-    }
-
     // ================================
     // ProxyClass Methods
     // ================================
@@ -88,16 +84,24 @@ class KJDK13ProxyClass extends ProxyClass
 
     public Proxy newInstance()
     {
-	return newJDK13Proxy(new KProxy(this, isAutoEnqueue), null);
+        if (dirty)
+            hotswap();
+
+	//return newJDK13Proxy(new KProxy(this, isAutoEnqueue), null);
+	return newJDK13Proxy(new KProxy(this, true), null);
     }
 
     public Proxy newInstance(Object[] args)
     {
+        if (dirty)
+            hotswap();
 	return newJDK13Proxy(new KProxy(this, isAutoEnqueue, args), null);
     }
 
     public Proxy newInstance(Class[] params, Object[] args)
     {
+        if (dirty)
+            hotswap();
 	return newJDK13Proxy(new KProxy(this, isAutoEnqueue, params, args), null);
     }
 
@@ -107,6 +111,8 @@ class KJDK13ProxyClass extends ProxyClass
 	    throw new NullPointerException
 		("A non-null ProxyInvocationHandler argument is required.");
 
+        if (dirty)
+            hotswap();
 	return newJDK13Proxy(new KProxy(this, isAutoEnqueue), h);
     }
 
@@ -116,6 +122,9 @@ class KJDK13ProxyClass extends ProxyClass
 	    throw new NullPointerException
 		("A non-null ProxyInvocationHandler argument is required.");
 
+        if (dirty)
+            hotswap();
+
 	return newJDK13Proxy(new KProxy(this, isAutoEnqueue, args), h);
     }
 
@@ -124,6 +133,9 @@ class KJDK13ProxyClass extends ProxyClass
 	if (h == null)
 	    throw new NullPointerException
 		("A non-null ProxyInvocationHandler argument is required.");
+
+        if (dirty)
+            hotswap();
 
 	return newJDK13Proxy(new KProxy(this, isAutoEnqueue, params, args), h);
     }

@@ -559,6 +559,10 @@ public abstract class ProxyCompiler
 	return listeners != null && listeners.size() > 0;
     }
 
+    protected void log(String msg) {
+        System.out.println("["+this.getClass().getName()+"] " + msg);
+    }
+
     // ================================
     // Instance Fields
     // ================================

@@ -48,6 +48,12 @@ class KProxy implements Proxy
 	hotswap_isAutoEnqueue(isAutoEnqueue);
 	hotswap_setConstructorParameters(params);
 	hotswap_setConstructorArguments(params);
+
+        //log("[KProxy] auto-enqueue: " + isAutoEnqueue);
+
+        if (isAutoEnqueue) {
+            cls.enqueue(this);
+        }
     }
 
     KProxy(ProxyClass cls, boolean isAutoEnqueue, Object[] args)
@@ -63,6 +69,10 @@ class KProxy implements Proxy
     KProxy(ProxyClass cls)
     {
 	this(cls, false, null, null);
+    }
+
+    protected void log(String msg) {
+        System.out.println("["+this.getClass().getName()+"] " + msg);
     }
 
     // ================================
@@ -135,6 +145,8 @@ class KProxy implements Proxy
     /* there may be deadlock conditions around this code */
     public Object hotswap()
     {
+        System.out.println("[KProxy] hotswap invoked");
+
 	// If the object is null, this is the first time the object
 	// has been constructed (or the arguments have been updated).
 	if (obj == null)

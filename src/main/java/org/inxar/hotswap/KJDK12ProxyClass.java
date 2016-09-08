@@ -41,6 +41,9 @@ class KJDK12ProxyClass extends ProxyClass
     KJDK12ProxyClass(ProxyCompiler compiler, Class cls)
     {
 	super(compiler, cls);
+
+        //log("jdk13 class impl: " + cls.getName());
+        //log("classloader: " + cls.getClassLoader().getClass().getName());
     }
 
     // ================================

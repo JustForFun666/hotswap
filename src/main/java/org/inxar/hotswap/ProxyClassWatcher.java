@@ -104,7 +104,8 @@ public class ProxyClassWatcher implements ProxyClassMonitor
     }
 
     /**
-     * Begin watching this ProxyClass for changes.
+     * Begin watching this ProxyClass for changes.  TODO: consider we
+     * also should watch for .class deletions.
      */
     public void watch(ProxyClass cls) {
         File src = cls.getSourceFile().toFile();
@@ -159,7 +160,9 @@ public class ProxyClassWatcher implements ProxyClassMonitor
 
             // http://stackoverflow.com/questions/9588737/is-java-7-watchservice-slow-for-anyone-else
             entry.key = dir.register(service,
-                                     new WatchEvent.Kind[]{StandardWatchEventKinds.ENTRY_MODIFY},
+                                     new WatchEvent.Kind[]{StandardWatchEventKinds.ENTRY_MODIFY,
+                                                           StandardWatchEventKinds.ENTRY_DELETE,
+                                                           StandardWatchEventKinds.ENTRY_CREATE},
                                      SensitivityWatchEventModifier.HIGH);
             if (dirs.isEmpty()) {
                 start();

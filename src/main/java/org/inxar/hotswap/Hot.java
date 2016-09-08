@@ -52,7 +52,8 @@ public class Hot {
         if (compiler == null) {
 
             try {
-                compiler = new KJavacCompiler();
+                compiler = new KJavaxCompiler();
+                //compiler = new KJavacCompiler();
             } catch (IllegalStateException isex) {
                 isex.printStackTrace();
                 compiler = new KSystemCompiler("javac");
@@ -127,4 +128,26 @@ public class Hot {
         }
 
     }
+
+    public static void inspect(Object obj) {
+        Class cls = obj.getClass();
+        //log("class: " + obj.getClass().getName());
+        //log("classloader: " + cls.getClassLoader().getClass().getName());
+        //log("interfaces: " + cls.getInterfaces());
+        for (Class i : cls.getInterfaces()) {
+            log("- " + i.getName());
+        }
+
+        if (obj instanceof Proxy) {
+          //log("proxy: yes");
+          Proxy proxy = (Proxy)obj;
+          ProxyClass proxyClass = proxy.hotswap_getProxyClass();
+          //log("proxy class: " + proxyClass.getClass().getName());
+        }
+    }
+
+    static void log(String msg) {
+        System.out.println("[Hotswap] " + msg);
+    }
+
 }

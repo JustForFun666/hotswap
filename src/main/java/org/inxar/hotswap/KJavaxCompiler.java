@@ -41,6 +41,14 @@ import javax.tools.JavaFileObject.Kind;
 /**
  * Concrete <code>ProxyCompiler</code> implementation that uses the
  * JDK1.7 javax.tools.JavaCompiler object.
+ *
+ * @see http://www.informit.com/articles/article.aspx?p=2027052&seqNum=2
+ * @see http://docs.oracle.com/javase/7/docs/api/javax/tools/JavaCompiler.html
+ * @see http://stackoverflow.com/questions/12173294/compiling-fully-in-memory-with-javax-tools-javacompiler
+ * @see http://www.java2s.com/Code/Java/JDK-6/CompilingfromMemory.htm
+ * @see https://github.com/OpenHFT/Java-Runtime-Compiler
+ * @see http://stackoverflow.com/questions/1563909/how-to-set-classpath-when-i-use-javax-tools-javacompiler-compile-the-source
+
 **/
 public class KJavaxCompiler extends ProxyCompiler
 {
@@ -134,6 +142,8 @@ public class KJavaxCompiler extends ProxyCompiler
             // arg5: compilation units
             Iterable <? extends JavaFileObject> units = getCompilationUnits(fileManager, sourceFile);
 
+            //log("[KJavaxCompiler] compiling " + units);
+
             // Create the compilation task
             JavaCompiler.CompilationTask task = compiler.getTask(errWriter,
                                                                  fileManager,
@@ -150,9 +160,15 @@ public class KJavaxCompiler extends ProxyCompiler
                 ? ProxyCompiler.RC_COMPILE_SUCCESS
                 : ProxyCompiler.RC_COMPILE_FAILURE;
 
+            //log("[KJavaxCompiler] success " + wasSuccessful + ": " + rc);
+
             err = errWriter.toString();
 
+            //log("[KJavaxCompiler] err " + err);
+
             out = formatDiagnostics(diagnostics);
+
+            //log("[KJavaxCompiler] out " + out);
 
 	} catch (Exception ioex) {
 	    ioex.printStackTrace();
@@ -161,6 +177,8 @@ public class KJavaxCompiler extends ProxyCompiler
 	    ioex.printStackTrace(pw);
 	    err += sw.toString();
 	    wasSuccessful = false;
+
+            //log("[KJavaxCompiler] exception " + err);
 	}
 
 	if (!wasSuccessful && (err == null || err.toString().length() == 0))

@@ -300,24 +300,37 @@ public abstract class ProxyClass
      * <code>ProxyEventListeners</code> will be notified of a
      * <code>ProxyClassSwapEvent</code>.
     **/
-    synchronized boolean hotswap()
+    public synchronized boolean hotswap()
     {
-	// If the source has NOT changed we return true immediately.
-	if (!dirty)
-	    return false;
+        System.out.println("[KProxyClass] hotswap invoked");
 
-	// If there are no proxies that will be involved in the
-	// hotswap, then dont bother. Only hotswap if it will make a
-	// difference to the end user.
-	if (!hasProxies())
+	// If the source has NOT changed we return true immediately.
+	if (!dirty) {
+            System.out.println("[KProxyClass] hotswap aborted (not dirty)");
 	    return false;
+        }
+
+        // on second thought, taking this out.  If we get a direct
+        // call to hotswap, recompile in the event of dirty, otherwise
+        // new proxies created after this.
+
+	// // If there are no proxies that will be involved in the
+	// // hotswap, then dont bother. Only hotswap if it will make a
+	// // difference to the end user.
+	// if (!hasProxies()) {
+        //     System.out.println("[KProxyClass] hotswap aborted (no proxies waiting to transact)");
+	//     return false;
+        // }
 
 	// Recompile the class.
 	int rc = compiler.compile(cls.getName(), sourceFile, classFile);
 
 	// If it did NOT recompile, abort.
-	if (rc != ProxyCompiler.RC_COMPILE_SUCCESS)
+	if (rc != ProxyCompiler.RC_COMPILE_SUCCESS) {
 	    return false;
+        }
+
+        dirty = false;
 
 	// Ok, the class has been successfully recompiled.  Next step
 	// is to reload the class.
@@ -402,6 +415,7 @@ public abstract class ProxyClass
 
     synchronized void enqueue(KProxy proxy)
     {
+      //log("[KProxyClass] enqueue: " + proxy);
 	proxies.add(proxy);
     }
 
@@ -426,6 +440,9 @@ public abstract class ProxyClass
     {
 	try {
 
+            if (dirty)
+                hotswap();
+
 	    return compiler.loadClass(cls.getName());
 
 	} catch (ClassNotFoundException ex) {
@@ -440,6 +457,11 @@ public abstract class ProxyClass
 	    while (i.hasNext())
 		((ProxyEventListener)i.next()).notify(evt);
 	}
+    }
+
+
+    protected void log(String msg) {
+        System.out.println("["+this.getClass().getName()+"] " + msg);
     }
 
     // ================================
